@@ -42,15 +42,33 @@ Tiny is a powerful terminal-based bioinformatics tool designed for DNA sequence 
 
 ### Steps
 
-1. Clone the repository:
+1. To install Poetry on Arch Linux, you can use the following command:
+```bash
+sudo pacman -S python-poetry
+```
+
+Alternatively, if you prefer to install it using the official installer, you can run:
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+Or head over to the official documentaion for poetry:
+```bash
+https://python-poetry.org/docs/
+```
+
+2. Clone the repository:
 ```bash
 git clone https://github.com/Bjorn99/Tiny.git
 cd Tiny
 ```
 
-2. Install dependencies using Poetry:
+3. Install dependencies using Poetry:
 ```bash
 poetry install
+```
+4. Activate the Virtual Environment:
+```bash
+poetry shell
 ```
 
 ## Usage 💻
