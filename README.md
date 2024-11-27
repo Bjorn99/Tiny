@@ -1,4 +1,4 @@
-# Tiny 🧬
+# Tiny
 
 Tiny is a powerful terminal-based bioinformatics tool designed for DNA sequence analysis. It provides various features for analyzing, comparing, and discovering patterns in DNA sequences.
 
@@ -71,7 +71,7 @@ poetry install
 poetry shell
 ```
 
-## Usage 💻
+## Usage
 
 ### Basic Analysis
 ```bash
@@ -137,7 +137,7 @@ poetry run tiny find-regulatory TATAAAAGGCGGGCCAATATCGATCG
    - JSON format for output files
    - No support for other common formats (GenBank, EMBL, etc.)
 
-## Contributing 🤝
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
@@ -145,14 +145,14 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 This project is licensed under the GPL License - see the LICENSE file for details.
 
-## Acknowledgments 🙏
+## Acknowledgments
 
 - Built with [BioPython](https://biopython.org/)
 - Project and dependency management with [Poetry](https://python-poetry.org/)
 - CLI interface powered by [Typer](https://typer.tiangolo.com/)
 - Terminal formatting by [Rich](https://rich.readthedocs.io/)
 
-## Project Status 📊
+## Project Status
 
 Tiny is under active development. Future planned features include:
 - Support for RNA sequences
@@ -164,7 +164,7 @@ Tiny is under active development. Future planned features include:
 - Advanced statistical analysis
 - Integration with external databases
 
-## Support 💬
+## Support
 
 If you encounter any issues or have questions, please:
 1. Check the existing issues on GitHub
