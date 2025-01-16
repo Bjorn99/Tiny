@@ -73,6 +73,8 @@ poetry shell
 
 ## Usage
 
+For a comprehensive list of examples and use cases, check out the [Examples.md](Examples.md)
+
 ### Basic Analysis
 ```bash
 # Analyze single or multiple sequences
@@ -136,6 +138,15 @@ poetry run tiny find-regulatory TATAAAAGGCGGGCCAATATCGATCG
    - Only supports FASTA format for file input
    - JSON format for output files
    - No support for other common formats (GenBank, EMBL, etc.)
+
+
+## Tips for using the tool effectively:
+
+- Always validate your input sequences before analysis
+- Use appropriate alignment modes based on your sequences
+- Consider sequence length limitations (max 10,000 bp)
+- Save results to files for later analysis
+- Use the FASTA format for multiple sequence analysis
 
 ## Contributing
 
