@@ -80,11 +80,11 @@ def align(
         help="Alignment mode"
     ),
 ):
-    """Perform sequence alignment with detailed visualization."""
+    """sequence alignment with detailed visualization."""
     try:
         result = AdvancedAnalysis.align_sequences(sequence1, sequence2, mode)
         
-        # Create rich text visualization
+        # Rich text visualization
         console.print("\n[bold]Sequence Alignment Results[/bold]")
         console.print(f"Mode: [cyan]{mode}[/cyan]")
         console.print(f"Alignment Score: [green]{result.alignment_score:.2f}[/green]")
@@ -116,7 +116,7 @@ def find_motifs(
     try:
         motifs = AdvancedAnalysis.find_motifs(sequences, motif_length, min_frequency)
         
-        # Create results table
+        # Results table
         table = Table(title="Motif Analysis Results")
         table.add_column("Motif", style="cyan")
         table.add_column("Frequency", style="magenta")

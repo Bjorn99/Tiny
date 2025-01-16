@@ -144,7 +144,7 @@ class AdvancedAnalysis:
     @staticmethod
     def find_regulatory_elements(sequence: str) -> Dict[str, List[Tuple[int, str]]]:
         """
-        Find potential regulatory elements in a DNA sequence.
+        Finding potential regulatory elements in a DNA sequence.
         """
         regulatory_elements = {
             'TATA_box': [],
@@ -168,7 +168,7 @@ class AdvancedAnalysis:
         for match in re.finditer(caat_pattern, sequence):
             regulatory_elements['CAAT_box'].append((match.start(), match.group()))
 
-        # Find palindromic sequences (min length 6)
+        # Finding palindromic sequences (min length 6)
         for i in range(len(sequence) - 5):
             for j in range(6, min(11, len(sequence) - i + 1)):
                 substr = sequence[i:i+j]
@@ -179,6 +179,6 @@ class AdvancedAnalysis:
 
     @staticmethod
     def _is_palindrome(seq: str) -> bool:
-        """Check if a sequence is palindromic."""
+        """Checking if a sequence is palindromic."""
         rev_comp = str(Seq(seq).reverse_complement())
         return seq == rev_comp
