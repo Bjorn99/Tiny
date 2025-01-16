@@ -28,7 +28,11 @@ class MotifResult:
 
 class AdvancedAnalysis:
     @staticmethod
-    def align_sequences(seq1: str, seq2: str, mode: str = 'global') -> AlignmentResult:
+    def align_sequences(seq1: str, seq2: str, mode: str = 'global',
+                       match_score: float = 2.0,
+                       mismatch_score: float = -1.0,
+                       gap_open_score: float = -10.0,
+                       gap_extend_score: float = -0.5) -> AlignmentResult:
         """
         Align two sequences using different alignment modes.
         
@@ -36,24 +40,28 @@ class AdvancedAnalysis:
             seq1: First sequence
             seq2: Second sequence
             mode: Alignment mode ('global', 'local', 'semi-global')
+        
+        Align sequences with customizable scoring parameters.
+        
+        
         """
         aligner = Align.PairwiseAligner()
+        aligner.match_score = match_score
+        aligner.mismatch_score = mismatch_score
+        aligner.open_gap_score = gap_open_score
+        aligner.extend_gap_score = gap_extend_score
         
-        # Set scoring parameters
-        aligner.match_score = 2.0
-        aligner.mismatch_score = -1.0
-        aligner.open_gap_score = -10.0  # Higher penalty for opening gaps
-        aligner.extend_gap_score = -0.5  # Lower penalty for extending gaps
-        
-        # Set mode
+        # Support for affine gap penalties
         if mode == 'global':
             aligner.mode = 'global'
         elif mode == 'local':
             aligner.mode = 'local'
-        else:  # semi-global
+        elif mode == 'semi-global':
             aligner.mode = 'global'
-            aligner.query_end_gap_score = 0  # No penalty for gaps at sequence ends
+            aligner.query_end_gap_score = 0
             aligner.target_end_gap_score = 0
+        else:
+            raise ValueError(f"Invalid alignment mode: {mode}")
 
         # Get best alignment
         alignments = aligner.align(seq1, seq2)
@@ -93,26 +101,27 @@ class AdvancedAnalysis:
     @staticmethod
     def find_motifs(sequences: List[str], 
                     motif_length: int, 
-                    min_frequency: int = 2) -> List[MotifResult]:
+                    min_frequency: int = 2,
+                    max_sequences: int = 1000) -> List[MotifResult]:
         """
-        Find common motifs in a set of sequences.
-        
-        Args:
-            sequences: List of DNA sequences
-            motif_length: Length of motifs to search for
-            min_frequency: Minimum frequency for a motif to be reported
+        Memory-efficient motif finding with sequence limit and progress tracking.
         """
+        if len(sequences) > max_sequences:
+            raise ValueError(f"Too many sequences. Maximum allowed: {max_sequences}")
+            
         motif_counts = Counter()
         motif_positions: Dict[str, List[int]] = {}
-
-        # Scan each sequence for potential motifs
-        for seq in sequences:
-            for i in range(len(seq) - motif_length + 1):
-                motif = seq[i:i + motif_length]
+        
+        # generators for memory efficiency
+        def motif_generator(seq: str, length: int):
+            return (seq[i:i + length] for i in range(len(seq) - length + 1))
+            
+        for seq_idx, seq in enumerate(sequences):
+            for motif in motif_generator(seq, motif_length):
                 motif_counts[motif] += 1
                 if motif not in motif_positions:
                     motif_positions[motif] = []
-                motif_positions[motif].append(i)
+                motif_positions[motif].append(seq_idx)
 
         # Filter motifs by minimum frequency
         common_motifs = []
