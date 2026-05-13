@@ -66,6 +66,85 @@ No abstractions for "future flexibility." No configurability beyond what an algo
 
 ---
 
+## Robustness & Resilience
+
+The spec's reliability claims are only as good as the mechanisms that enforce them. This section turns the architectural principle into concrete contracts.
+
+### Dependency Tiering
+
+Three tiers, made explicit in `pyproject.toml`:
+
+| Tier | Examples | Failure behavior |
+|---|---|---|
+| **Hard** — required for CLI to run at all | `typer`, `rich` | If missing, install is broken — fail loud at install time. |
+| **Core** — required for core analysis features | `biopython` | If missing, core analysis commands raise a clear `ImportError` with install hint. |
+| **Optional extras** — required only for specific features | `pysam` (SAM/BAM), `Bio.Entrez` (network fetch) | If missing, only the dependent command fails, with a clear "install with `poetry install -E sam`" message. Trunk and all other commands continue working. |
+
+Dev tools (`black`, `isort`, `flake8`, `pytest`, `pre-commit`, `ruff`) live in `[tool.poetry.group.dev.dependencies]`, NOT in main deps. End users never install your linters.
+
+Unused deps to remove from `pyproject.toml`: `pandas`, `numpy` (no imports anywhere), `pathlib = "^1.0.1"` (stdlib since Python 3.4 — the backport is harmful).
+
+### CLI Lazy-Loading Pattern
+
+Top of `tiny/cli.py` imports `typer`, `rich`, and stdlib only. Every command function imports its dependencies inside its body:
+
+```python
+@app.command()
+def analyze(...):
+    from tiny.core.sequence import DNASequence  # imported only when this command runs
+    from tiny.core.formats import FormatHandler
+    ...
+```
+
+This guarantees that breakage in any one module affects only commands that import it. `tiny --help` is bulletproof — it lists all commands without importing any of their dependencies.
+
+### Trunk Stability Contract Test
+
+A test file `tests/test_trunk_stability.py` enforces the architectural promise. It:
+
+1. Imports `tiny`, `tiny.core.sequence`, `tiny.core.analysis` and asserts no exceptions.
+2. Mocks `sys.modules['pysam']` to a broken stub and verifies `tiny --help` and `tiny analyze ATCG` still succeed.
+3. Runs in CI on every PR.
+
+If this test breaks, the architectural principle has been violated. Treat as a release blocker.
+
+### Error Handling Contract
+
+Three layers, each with a defined responsibility:
+
+- **Core modules** raise specific, named exceptions: `InvalidSequenceError`, `UnsupportedFormatError`, etc. They never `sys.exit` or `print`. They are library-callable.
+- **Algorithm modules** raise core exceptions or new specific ones. Same rule: no `sys.exit`, no `print`.
+- **`cli.py`** catches known exception types and renders them as friendly Rich panels with exit code 1. Unknown exceptions are re-raised with full traceback for debugging.
+
+This means: Tiny modules can be imported and used as a library, not just a CLI.
+
+### Resource Limits
+
+The trunk enforces explicit limits with clear error messages:
+
+- `DNASequence` rejects sequences longer than `MAX_SEQUENCE_LENGTH` (default 10,000 bp, configurable via env var `TINY_MAX_SEQUENCE`).
+- File reads reject files larger than `MAX_FILE_SIZE` (default 100 MB).
+- Both limits raise typed exceptions with the actual size and the limit in the message.
+
+These aren't security boundaries — they're guardrails against accidental memory blow-up on a laptop.
+
+### Quality Gates (CI + Pre-commit)
+
+Continuous integration via GitHub Actions runs on every push and PR. Two job matrices:
+
+- **Core matrix:** Python 3.12, 3.13, 3.14. Installs without the `sam` extra. Runs `ruff check`, `pytest` (tests marked `requires_sam` auto-skip), and `poetry build`. Trunk stability contract test runs here — proves the trunk works without pysam on every supported Python.
+- **Full matrix:** Python 3.12, 3.13 (3.14 added once pysam has wheels). Installs with `-E sam`. Runs the complete pytest suite including SAM/BAM tests.
+
+Pre-commit hooks (configured in `.pre-commit-config.yaml`) run before every commit:
+
+- `ruff format` and `ruff check --fix` for formatting and linting.
+- Trailing-whitespace, end-of-file-fixer, check-yaml, check-toml.
+- `pytest -m quick` (a fast subset, configured via marker).
+
+Both are configured in Phase 0 and never relaxed afterwards.
+
+---
+
 ## Current State Assessment
 
 **What's solid and stays:**
@@ -78,9 +157,14 @@ No abstractions for "future flexibility." No configurability beyond what an algo
 - Test scaffold in `tests/`
 
 **What's broken and needs fixing:**
-1. **Install/run blocker (Phase 0 priority):** Tiny fails to start because `tiny/core/formats.py` does an eager top-level `import pysam`, and pysam's C extension is incompatible with the installed Python 3.14 (`AttributeError: module 'pysam.libcalignedsegment' has no attribute 'CMATCH'`). This breaks the trunk because of a leaf dependency.
-2. **Consensus score bug** (`tiny/core/advanced.py::_calculate_consensus_score`): all bases weighted 0.25 → returns 0.25 for every motif. Meaningless metric. Fix or replace with information content.
-3. **CLI flag inconsistency**: docs reference `--fasta`, CLI uses `--input`. Standardize on `--input`.
+1. **Install/run blocker (Phase 0 priority):** `tiny --help` fails because `tiny/cli.py` eagerly imports `tiny.core.formats`, which eagerly imports `pysam`, whose C extension is incompatible with Python 3.14 (`AttributeError: module 'pysam.libcalignedsegment' has no attribute 'CMATCH'`). A single leaf dependency takes down the whole CLI.
+2. **Consensus score bug** (`tiny/core/advanced.py::_calculate_consensus_score`): all bases weighted 0.25 → returns 0.25 for every motif. Meaningless metric. Replace with Shannon information content, or remove the field.
+3. **CLI flag inconsistency:** docs reference `--fasta`, CLI uses `--input`. Standardize on `--input`.
+4. **Dead/wrong dependencies in `pyproject.toml`:** `pandas` and `numpy` are listed as hard deps but never imported anywhere in the code. `pathlib = "^1.0.1"` is a Python 2 backport (pathlib is stdlib since 3.4 — the backport package can mask the stdlib version and cause subtle bugs). Dev tools (`black`, `isort`, `flake8`, `pysam`) are in main deps rather than dev/extras.
+5. **No `.gitignore`:** `__pycache__/`, `.pytest_cache/`, etc. show up as untracked on every status check.
+6. **No CI:** silent regressions land in `main` until someone manually runs tests.
+7. **No `--version` flag.** Trivial but a basic CLI affordance.
+8. **No resource limits enforced.** README claims max 10,000 bp but nothing in code stops a user from passing a 500 MB sequence and exhausting memory.
 
 **What's overengineered and may be simplified:**
 - The GenBank feature-tree rendering inside `analyze` in `cli.py` (~80 lines). Move to its own module or simplify. Not urgent.
@@ -138,23 +222,56 @@ Two new top-level directories: `tiny/algorithms/` and `notebooks/`. Everything e
 
 Each phase is **roughly 2 weeks** at 5-7 hours/week. Reality compresses and expands. The phase ordering matters; the calendar doesn't.
 
-### Phase 0 — Install fix, bug fix, RNA support (Week 1)
+### Phase 0 — Foundation hardening (Weeks 1-2)
 
-**Goal:** A working `tiny --help` and clean foundation for new work.
+**Goal:** A working `tiny --help` and a foundation that won't silently rot. Phase 0 is wider than originally scoped because every later phase depends on it. Resist shortcuts here.
 
-Concrete tasks:
-- Make pysam a **lazy import** in `tiny/core/formats.py` — only imported when `read_sam_bam()` is called. If pysam is unavailable, the SAM/BAM handler raises a clear "install pysam to use this format" error. Trunk loads cleanly without it.
-- Fix `_calculate_consensus_score` bug — replace with Shannon information content over base frequencies, or remove the field entirely from `MotifResult` if it's not used elsewhere.
-- Add minimal `RNASequence` support — either an `is_rna` flag on `DNASequence` or a sister class. Trivial extension.
+**Phase 0.1 — Make the trunk truly resilient**
+- Convert `tiny/cli.py` to the lazy-loading pattern: top imports only `typer`, `rich`, stdlib. Each command function imports its own dependencies inside the body.
+- Make `pysam` a lazy import inside `read_sam_bam()` in `tiny/core/formats.py`. Catch `ImportError` and re-raise as a clear `OptionalDependencyError("Install pysam: poetry install -E sam")`.
+- Define a typed exception hierarchy in `tiny/core/errors.py`: `TinyError`, `InvalidSequenceError`, `UnsupportedFormatError`, `OptionalDependencyError`, `ResourceLimitError`. Trunk modules raise these — never `sys.exit`, never `print`.
+
+**Phase 0.2 — Dependency hygiene**
+- Edit `pyproject.toml`:
+  - Remove `pandas`, `numpy`, `pathlib` from deps (unused / harmful backport).
+  - Move `black`, `isort`, `flake8`, `pytest` to `[tool.poetry.group.dev.dependencies]` exclusively (they're already partially there — clean up duplication).
+  - Move `pysam` to `[tool.poetry.extras]` as `sam = ["pysam"]`.
+  - Add `ruff` to dev deps (replaces black + isort + flake8 with one faster tool).
+  - Pin Python version more tightly: `python = ">=3.12,<3.15"` until pysam catches up to 3.14.
+- Run `poetry lock --no-update` then `poetry install` to regenerate the lockfile cleanly.
+
+**Phase 0.3 — Bugfixes and small features**
+- Fix `_calculate_consensus_score` — replace with Shannon information content (or remove the field).
+- Add `RNASequence` (the decision between sister class vs flag is in Open Questions; pick before starting).
+- Add `tiny --version` flag (reads from `tiny.__version__`).
 - Standardize CLI on `--input` everywhere. Update README.md and Examples.md to remove `--fasta` references.
-- Verify `tiny` runs end-to-end on Python 3.14: `tiny analyze ATCG`, `tiny analyze --input eg_files/<some.fasta>`.
+- Enforce `MAX_SEQUENCE_LENGTH` and `MAX_FILE_SIZE` in trunk with clear `ResourceLimitError` messages.
 
-Validation:
-- `poetry run tiny --help` succeeds.
-- `poetry run pytest` passes.
-- Removing/uninstalling pysam doesn't break `tiny --help` or `tiny analyze`.
+**Phase 0.4 — Quality scaffolding (one-time cost, perpetual benefit)**
+- Add `.gitignore` covering Python (`__pycache__/`, `.pytest_cache/`, `.venv/`, `*.pyc`, `.coverage`, `htmlcov/`, `dist/`, `build/`, `*.egg-info/`, `.mypy_cache/`, `.ruff_cache/`, IDE files).
+- Add `.pre-commit-config.yaml` running `ruff format`, `ruff check --fix`, basic file hygiene hooks.
+- Add `.github/workflows/ci.yml` — matrix on Python 3.12 + 3.13, runs `ruff check`, `pytest`, `poetry build`.
+- Add `pytest.ini` (or `[tool.pytest.ini_options]` in pyproject) with a `quick` marker for fast pre-commit subset.
 
-### Phase 1 — ORF finding + translation (Weeks 2-3)
+**Phase 0.5 — Stability contract test**
+- Add `tests/test_trunk_stability.py`:
+  - `test_import_tiny()` — bare `import tiny` succeeds.
+  - `test_import_core_sequence()` — `import tiny.core.sequence` succeeds.
+  - `test_help_runs_without_pysam()` — uses `monkeypatch` to delete `pysam` from `sys.modules` and stub it as unimportable, verifies `tiny --help` exits 0 via Typer's `CliRunner`.
+  - `test_analyze_runs_without_pysam()` — same monkeypatch, runs `tiny analyze ATCG` via `CliRunner`, verifies exit 0.
+- These tests are the architectural principle made executable. CI runs them.
+
+**Validation (all must pass before declaring Phase 0 done):**
+- `poetry install` succeeds on a fresh checkout. `poetry install -E sam` also succeeds (when pysam wheels exist for the Python version).
+- `poetry run tiny --version` prints the version.
+- `poetry run tiny --help` succeeds even when pysam is uninstalled/broken.
+- `poetry run tiny analyze ATCG` succeeds and prints results.
+- `poetry run pytest` passes, including `test_trunk_stability.py`.
+- `poetry run ruff check` reports no errors.
+- CI on GitHub Actions runs green on a pushed branch.
+- `git status` is clean (no untracked `__pycache__` etc.).
+
+### Phase 1 — ORF finding + translation (Weeks 3-4)
 
 **Goal:** First "algorithm + notebook + CLI" cycle ships, establishing the template.
 
@@ -173,7 +290,7 @@ Concrete tasks:
 - Tests in `tests/test_orf.py` (frame extraction, ORF detection edge cases, translation correctness).
 - First blog post drafted from the notebook (optional — can come later).
 
-### Phase 2 — Primer Tm calculator (Weeks 4-5)
+### Phase 2 — Primer Tm calculator (Weeks 5-6)
 
 **Goal:** The most wet-lab-relevant algorithm. User's existing intuition makes this satisfying.
 
@@ -190,7 +307,7 @@ Concrete tasks:
   - Validate against an online primer Tm calculator (e.g., IDT or BioPython's `Bio.SeqUtils.MeltingTemp`).
 - Tests with primers of known Tm from the literature.
 
-### Phase 3 — PWM-based motif finding (Weeks 6-7)
+### Phase 3 — PWM-based motif finding (Weeks 7-8)
 
 **Goal:** Statistical motif finding done right. Replaces (or supplements) the buggy consensus-score approach.
 
@@ -206,7 +323,7 @@ Concrete tasks:
   - PWMs vs simple frequency counting — what's the biological intuition?
   - Example: scan for TATA box using a real PWM (from JASPAR or hand-derived from known TATA sequences).
 
-### Phase 4 — Hand-coded DP alignment (Weeks 8-10)
+### Phase 4 — Hand-coded DP alignment (Weeks 9-11)
 
 **Goal:** Implement Needleman-Wunsch and Smith-Waterman from scratch. Verify against BioPython.
 
@@ -223,7 +340,7 @@ Concrete tasks:
   - Why affine gaps matter biologically.
   - Cross-check: same inputs, same scores from `tiny align-dp` and `tiny align`.
 
-### Phase 5 — BWT + FM-index (Weeks 11-14)
+### Phase 5 — BWT + FM-index (Weeks 12-15)
 
 **Goal:** The crown jewel. Demonstrates understanding of modern NGS alignment internals.
 
@@ -241,7 +358,7 @@ Concrete tasks:
   - Memory footprint vs naive search.
 - This phase intentionally takes longer. It's the hardest and most rewarding.
 
-### Phase 6 — Optional: NCBI/Entrez fetch (Week 15)
+### Phase 6 — Optional: NCBI/Entrez fetch (Week 16)
 
 **Goal:** Practical connector to real biological databases.
 
@@ -282,11 +399,16 @@ Once Phase 0 is complete, the trunk modules have stable interfaces:
 
 | Risk | Mitigation |
 |---|---|
-| pysam keeps breaking on Python upgrades | Lazy import isolates the breakage. User can downgrade Python or pin pysam later if SAM/BAM matters. |
+| pysam keeps breaking on Python upgrades | Lazy import isolates blast radius. Pinned to optional extras: `poetry install -E sam`. Trunk stability test catches regressions. |
+| Other dependency drift (BioPython API changes, Typer 1.0, etc.) | CI matrix on multiple Python versions catches breakage before merge. Major-version-pin critical deps in pyproject.toml. |
 | Scope creep into "Tiny does everything" | This spec explicitly forbids it. Cancer analysis lives in a separate repo. Review scope at the end of each phase. |
+| Silent regressions in the trunk | `test_trunk_stability.py` runs on every CI pipeline and pre-commit. Architectural rule is executable, not aspirational. |
+| Memory blow-up on huge sequence input | `MAX_SEQUENCE_LENGTH` and `MAX_FILE_SIZE` enforced at trunk level with `ResourceLimitError`. Defaults sized for a laptop. |
 | Wet-lab time pressure stalling the project | 5-7 hr/week cadence is designed to absorb this. Skipping a week is fine. |
 | Algorithm too hard (especially BWT/FM-index) | Phase 5 is intentionally long. Plenty of public references (Langmead's notes, "Bioinformatics Algorithms" textbook). |
 | Notebooks become a chore | Keep them small. 500-1000 words + working code, not 5000-word essays. Cross-post to blog so they double as content. |
+| Code drift (linting/formatting variance over months of slow work) | Pre-commit hooks + ruff in CI enforce consistency without willpower. |
+| Coming back to the project after a break and losing context | Each phase's commits + the design doc + memory notes are enough to resume from cold. ADR-style commit messages for non-obvious decisions. |
 
 ---
 
@@ -295,11 +417,13 @@ Once Phase 0 is complete, the trunk modules have stable interfaces:
 End-state criteria for "Tiny is done" (i.e., ready as a polished portfolio piece):
 
 1. `poetry install && poetry run tiny --help` works on a fresh checkout.
-2. Five algorithm modules under `tiny/algorithms/`, each with: implementation, CLI command, tests, notebook.
-3. Trunk modules unchanged in API since Phase 0.
-4. README rewritten to reflect the new identity: focused educational tool, not kitchen-sink CLI.
-5. At least 3 blog posts published on akarn.netlify.app derived from the notebooks.
-6. The codebase is something the user is proud to show.
+2. `tiny --help` and `tiny analyze ATCG` work even when optional extras (pysam) are missing or broken.
+3. CI green on Python 3.12 and 3.13 (3.14 once pysam catches up). Trunk stability contract test passing.
+4. Five algorithm modules under `tiny/algorithms/`, each with: implementation, CLI command, tests, notebook.
+5. Trunk modules unchanged in public API since Phase 0 (signature stability is a published guarantee).
+6. README rewritten to reflect the new identity: focused educational tool, not kitchen-sink CLI.
+7. At least 3 blog posts published on akarn.netlify.app derived from the notebooks.
+8. The codebase is something the user is proud to show.
 
 ---
 
