@@ -1,8 +1,7 @@
 # Tiny Revival — Design Spec
 
 **Date:** 2026-05-13
-**Status:** Draft for user review
-**Author:** Brainstormed collaboratively with Claude
+**Status:** Draft for review
 
 ---
 
