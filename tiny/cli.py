@@ -14,6 +14,28 @@ app = typer.Typer(help="🧬 Tiny - DNA Sequence Analysis Tool")
 console = Console()
 
 
+def _version_callback(value: bool):
+    if value:
+        from tiny import __version__
+
+        typer.echo(f"tiny {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show version and exit.",
+    ),
+):
+    """Tiny — DNA sequence analysis CLI."""
+
+
 class AlignmentMode(str, Enum):
     global_align = "global"
     local = "local"
