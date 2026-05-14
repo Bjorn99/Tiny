@@ -141,7 +141,7 @@ CCAATGGCTAGCTAAATATATACGCG
 EOF
 
 # Analyze sequences from FASTA file
-tiny analyze --fasta sequences.fasta
+tiny analyze --input sequences.fasta
 ```
 
 ## Sequence Comparison
@@ -221,7 +221,7 @@ tiny find-motifs ATCGATCGTATA ATCTATCGTATA ATCGAGCGTATA --length 4 --min-freq 2
 ### Advanced Motif Analysis
 ```bash
 # Find longer motifs with higher frequency requirement
-tiny find-motifs --fasta sequences.fasta --length 6 --min-freq 3
+tiny find-motifs --input sequences.fasta --length 6 --min-freq 3
 ```
 
 ## Regulatory Element Analysis
@@ -286,7 +286,7 @@ ATCGAGCGTATA
 EOF
 
 # Find conserved motifs
-tiny find-motifs --fasta variants.fasta --length 4 --min-freq 3
+tiny find-motifs --input variants.fasta --length 4 --min-freq 3
 ```
 
 ## Working with Files
@@ -294,14 +294,14 @@ tiny find-motifs --fasta variants.fasta --length 4 --min-freq 3
 ### File Input/Output
 ```bash
 # Input from FASTA
-tiny analyze --fasta sequences.fasta
+tiny analyze --input sequences.fasta
 
 # Output to JSON
 tiny analyze ATCGATCG --output analysis_results.json
 
 # Batch processing
 for file in *.fasta; do
-    tiny analyze --fasta "$file" --output "${file%.fasta}_results.json"
+    tiny analyze --input "$file" --output "${file%.fasta}_results.json"
 done
 ```
 
@@ -347,7 +347,7 @@ tiny analyze --input sequence.gb  # Often contains ambiguous bases
    tiny analyze ATCG GCTA CGTA TAGC
 
    # Good:
-   tiny analyze --fasta sequences.fasta
+   tiny analyze --input sequences.fasta
    ```
 
 ## Common Issues and Solutions

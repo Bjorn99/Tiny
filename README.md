@@ -139,7 +139,7 @@ tiny align ATCGATCG ATCTATCG --mode semi-global
 tiny find-motifs ATCGATCG ATCTATCG ATCGAGCG --length 4 --min-freq 2
 
 # Find motifs in sequences from a file
-tiny find-motifs --fasta sequences.fasta --length 6 --min-freq 3
+tiny find-motifs --input sequences.fasta --length 6 --min-freq 3
 ```
 
 ### Regulatory Element Analysis
