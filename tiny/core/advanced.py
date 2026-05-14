@@ -1,3 +1,4 @@
+import math
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -150,12 +151,22 @@ class AdvancedAnalysis:
 
     @staticmethod
     def _calculate_consensus_score(motif: str) -> float:
-        """Calculate a conservation score for a motif."""
-        base_weights = {"A": 0.25, "T": 0.25, "G": 0.25, "C": 0.25}
-        score = 0
-        for base in motif:
-            score += base_weights[base]
-        return score / len(motif)
+        """Average per-position information content in bits.
+
+        For a 4-letter alphabet max entropy is 2 bits (uniform); a fully
+        conserved single-base motif has 0 entropy and information content 2.
+        We compute over the motif's empirical base frequencies so motifs
+        with skewed composition score higher than uniform ones.
+        """
+        if not motif:
+            return 0.0
+        counts = Counter(motif)
+        total = len(motif)
+        entropy = 0.0
+        for count in counts.values():
+            p = count / total
+            entropy -= p * math.log2(p)
+        return 2.0 - entropy
 
     @staticmethod
     def find_regulatory_elements(sequence: str) -> dict[str, list[tuple[int, str]]]:
