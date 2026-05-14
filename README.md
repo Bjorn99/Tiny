@@ -64,44 +64,42 @@ Tiny is a powerful terminal-based bioinformatics tool designed for DNA sequence 
 ## Installation 📦
 
 ### Prerequisites
-- Python 3.9 or higher
-- Poetry (Python package manager)
+- Python 3.12+ (tested on 3.12, 3.13, 3.14)
+- Poetry 2.x (Python package manager)
 
-### Steps
+For detailed install / run / troubleshooting steps see [INSTRUCTIONS.md](INSTRUCTIONS.md).
 
-1. To install Poetry on Arch Linux, you can use the following command:
-```bash
-sudo pacman -S python-poetry
-```
+### Quick start
 
-Alternatively, if you prefer to install it using the official installer, you can run:
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-Or head over to the official documentation for poetry:
-```bash
-https://python-poetry.org/docs/
-```
-
-2. Clone the repository:
 ```bash
 git clone https://github.com/Bjorn99/Tiny.git
 cd Tiny
+poetry install                 # core install (no SAM/BAM support)
+poetry install --extras sam    # add pysam for SAM/BAM (Python 3.12/3.13 only)
+poetry run tiny --version
+poetry run tiny analyze ATCGATCG
 ```
 
-3. Install dependencies using Poetry:
-```bash
-poetry install
-```
+To work inside the venv (Poetry 2.x):
 
-4. Activate the Virtual Environment:
 ```bash
-poetry shell
+# Poetry prints the activation command; run it. Fish example:
+source (poetry env info --path)/bin/activate.fish
+# Or bash/zsh:
+source "$(poetry env info --path)/bin/activate"
 ```
 
 ## Usage
 
-For a comprehensive list of examples and use cases, check out the [Examples.md](Examples.md)
+For a comprehensive list of examples and use cases, check out the [Examples.md](Examples.md). For install and troubleshooting see [INSTRUCTIONS.md](INSTRUCTIONS.md).
+
+### Version and help
+```bash
+tiny --version           # print version (e.g. tiny 0.2.0)
+tiny --help              # global help
+tiny analyze --help      # per-command help
+tiny supported-formats   # list supported file formats
+```
 
 ### Basic Analysis
 ```bash
@@ -151,14 +149,15 @@ tiny find-regulatory TATAAAAGGCGGGCCAATATCGATCG
 ## Limitations and Considerations ⚠️
 
 1. **Performance Limitations**
-   - Not optimized for very long sequences (>10,000 bp)
+   - Designed for targeted-panel scale, not whole-genome data
    - Memory usage increases significantly with sequence length in pairwise alignments
    - Motif finding can be computationally intensive for long sequences
 
 2. **Input Capabilities**
-   - Handles DNA sequences with IUPAC ambiguous bases
-   - Supports multiple file formats (FASTA, FASTQ, GenBank, EMBL)
-   - Maximum recommended sequence length: 10,000 bp
+   - DNA sequences with full IUPAC ambiguous-base support
+   - RNA sequences via `RNASequence` class (programmatic API; CLI exposure planned)
+   - Supports multiple file formats (FASTA, FASTQ, GenBank, EMBL, plus SAM/BAM with the `sam` extra)
+   - Hard cap on per-sequence length: **10,000 bp** (raises `ResourceLimitError`). Override per-call with `TINY_MAX_SEQUENCE=50000 tiny analyze ...`.
 
 3. **Analysis Limitations**
    - No support for multiple sequence alignment
@@ -192,8 +191,8 @@ This project is licensed under the GPL License - see the LICENSE file for detail
 
 ## Project Status
 
-Tiny is under active development. Future planned features include:
-- Support for RNA sequences
+Tiny is under active revival (Phase 0 complete: foundation hardening — typed errors, lazy heavy deps, CI, RNA class, version flag, resource limits). Future planned features:
+- CLI exposure for RNA sequence analysis
 - Multiple sequence alignment
 - Phylogenetic analysis
 - Secondary structure prediction
