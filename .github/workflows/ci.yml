@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  core:
+    name: core (no extras) — py${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install dependencies
+        run: poetry install --no-interaction
+      - name: Lint
+        run: poetry run ruff check .
+      - name: Format check
+        run: poetry run ruff format --check .
+      - name: Test (skips requires_sam)
+        run: poetry run pytest -v -m "not requires_sam"
+      - name: Build
+        run: poetry build
+
+  full:
+    name: full (with sam extra) — py${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install dependencies with sam extra
+        run: poetry install --extras sam --no-interaction
+      - name: Test (all)
+        run: poetry run pytest -v
