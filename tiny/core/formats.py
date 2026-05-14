@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-import pysam
 from Bio import SeqIO
 
 
@@ -104,6 +103,13 @@ class FormatHandler:
     @staticmethod
     def read_sam_bam(file_path: Path) -> list[SequenceRecord]:
         """Read sequences from SAM/BAM format."""
+        try:
+            import pysam
+        except ImportError as e:
+            from tiny.core.errors import OptionalDependencyError
+
+            raise OptionalDependencyError("pysam", "poetry install -E sam") from e
+
         records = []
         with pysam.AlignmentFile(str(file_path), "r") as sam_file:
             for read in sam_file.fetch():
