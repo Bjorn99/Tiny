@@ -10,12 +10,6 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeRe
 from rich.table import Table
 from rich.tree import Tree
 
-from tiny.core.advanced import AdvancedAnalysis
-from tiny.core.analysis import analyze_sequences, compare_sequences
-from tiny.core.formats import FormatHandler
-from tiny.core.sequence import DNASequence
-from tiny.core.utils import save_results
-
 app = typer.Typer(help="🧬 Tiny - DNA Sequence Analysis Tool")
 console = Console()
 
@@ -71,6 +65,11 @@ def analyze(
     ),
 ):
     """✨ Analyze DNA sequences and display comprehensive results."""
+    from tiny.core.analysis import analyze_sequences
+    from tiny.core.formats import FormatHandler
+    from tiny.core.sequence import DNASequence
+    from tiny.core.utils import save_results
+
     try:
         with show_progress("Analyzing sequences") as progress:
             task = progress.add_task("Processing...", total=100)
@@ -242,6 +241,10 @@ def compare(
     ),
 ):
     """🔍 Compare two DNA sequences for mutations and similarities."""
+    from tiny.core.analysis import compare_sequences
+    from tiny.core.formats import FormatHandler
+    from tiny.core.sequence import DNASequence
+
     try:
         with show_progress("Comparing sequences") as progress:
             task = progress.add_task("Processing...", total=100)
@@ -296,6 +299,8 @@ def align(
     mode: AlignmentMode = typer.Option(AlignmentMode.global_align, help="Alignment mode"),
 ):
     """Perform sequence alignment with detailed visualization."""
+    from tiny.core.advanced import AdvancedAnalysis
+
     try:
         with show_progress("Performing alignment") as progress:
             task = progress.add_task("Processing...", total=100)
@@ -344,6 +349,9 @@ def find_motifs(
     min_frequency: int = typer.Option(2, "--min-freq", "-m"),
 ):
     """Find common motifs in DNA sequences."""
+    from tiny.core.advanced import AdvancedAnalysis
+    from tiny.core.formats import FormatHandler
+
     try:
         with show_progress("Finding motifs") as progress:
             task = progress.add_task("Processing...", total=100)
@@ -387,6 +395,8 @@ def find_regulatory(
     sequence: str = typer.Argument(..., help="DNA sequence to analyze"),
 ):
     """🧬 Find potential regulatory elements in a DNA sequence."""
+    from tiny.core.advanced import AdvancedAnalysis
+
     try:
         with show_progress("Analyzing regulatory elements") as progress:
             task = progress.add_task("Processing...", total=100)
