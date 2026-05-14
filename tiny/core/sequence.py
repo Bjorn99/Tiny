@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -37,8 +38,12 @@ class DNASequence:
         self._cached_molecular_weight: float | None = None
 
     def _validate(self):
-        """Validate the sequence against the class's alphabet."""
-        from tiny.core.errors import InvalidSequenceError
+        """Validate the sequence against the class's alphabet and size limit."""
+        from tiny.core.errors import InvalidSequenceError, ResourceLimitError
+
+        max_len = int(os.environ.get("TINY_MAX_SEQUENCE", "10000"))
+        if len(self.sequence) > max_len:
+            raise ResourceLimitError("sequence length", actual=len(self.sequence), limit=max_len)
 
         invalid_bases = set(self.sequence) - set(self.IUPAC_CODES.keys())
         if invalid_bases:
