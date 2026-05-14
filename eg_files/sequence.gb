@@ -31047,7 +31047,7 @@ FEATURES             Location/Qualifiers
                      RPGEVEGVHYYFVSKEEFESLIEQDLFLEYAKVFGGNYYGTSLPAIEENLAKGIDVFL
                      DIDWQGAQQIRKKVPSVKSIFILPPSLPELERRLIGRGQDSEEVIAERMSKAMSEISH
                      YDEYDYVIVNDDFEKTLKDLQSILQSERLTKDYQQKQNAMLIQQLLAK"
-ORIGIN      
+ORIGIN
         1 tatggcaatt aaaattggta tcaatggttt tggtcgtatc ggccgtatcg tattccgtgc
        61 agcacaacac cgtgatgaca ttgaagttgt aggtattaac gacttaatcg acgttgaata
       121 catggcttat atgttgaaat atgattcaac tcacggtcgt ttcgacggca ctgttgaagt
@@ -61552,4 +61552,3 @@ ORIGIN
   1830061 ctgtgcgttg tcttactgag tgagcagtat tactcaaagc aaacagattt gtttaactta
   1830121 aataaaaggt gaaaatct
 //
-

@@ -345,7 +345,7 @@ tiny analyze --input sequence.gb  # Often contains ambiguous bases
    # For multiple sequences, use FASTA files instead of command line input
    # Bad:
    tiny analyze ATCG GCTA CGTA TAGC
-   
+
    # Good:
    tiny analyze --fasta sequences.fasta
    ```
