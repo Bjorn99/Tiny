@@ -1,0 +1,26 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=500]
+
+  - repo: local
+    hooks:
+      - id: pytest-quick
+        name: pytest (quick subset)
+        entry: bash -c 'poetry run pytest -m quick -q; rc=$?; [ "$rc" -eq 5 ] && exit 0 || exit "$rc"'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
