@@ -37,13 +37,15 @@ class DNASequence:
         self._cached_molecular_weight: float | None = None
 
     def _validate(self):
-        """Validate the DNA sequence with IUPAC codes."""
+        """Validate the sequence against the class's alphabet."""
+        from tiny.core.errors import InvalidSequenceError
+
         invalid_bases = set(self.sequence) - set(self.IUPAC_CODES.keys())
         if invalid_bases:
-            raise ValueError(
-                f"Invalid DNA sequence. Found invalid bases: {', '.join(invalid_bases)}.\n"
-                f"Allowed bases: {', '.join(self.IUPAC_CODES.keys())}\n"
-                "This includes IUPAC ambiguity codes (R,Y,M,K,S,W,B,D,H,V,N)."
+            raise InvalidSequenceError(
+                f"Invalid {self.__class__.__name__} bases: "
+                f"{', '.join(sorted(invalid_bases))}. "
+                f"Allowed: {', '.join(sorted(self.IUPAC_CODES.keys()))}"
             )
 
     def _count_gc_weighted(self, base: str) -> float:
@@ -78,6 +80,7 @@ class DNASequence:
             "C": 307.2,
             "G": 347.2,
             "T": 322.2,
+            "U": 324.2,  # uracil monophosphate — lets RNA inherit this method
             "N": 327.0,  # Average weight
             "R": 339.2,  # (A+G)/2
             "Y": 314.7,  # (C+T)/2
@@ -124,3 +127,42 @@ class DNASequence:
 
     def __eq__(self, other: "DNASequence") -> bool:
         return self.sequence == other.sequence
+
+
+class RNASequence(DNASequence):
+    """RNA sequence with U replacing T. Inherits DNA logic with overrides."""
+
+    IUPAC_CODES: ClassVar[dict[str, list[str]]] = {
+        "A": ["A"],
+        "C": ["C"],
+        "G": ["G"],
+        "U": ["U"],
+        "R": ["A", "G"],
+        "Y": ["C", "U"],
+        "M": ["A", "C"],
+        "K": ["G", "U"],
+        "S": ["C", "G"],
+        "W": ["A", "U"],
+        "B": ["C", "G", "U"],
+        "D": ["A", "G", "U"],
+        "H": ["A", "C", "U"],
+        "V": ["A", "C", "G"],
+        "N": ["A", "C", "G", "U"],
+    }
+
+    _COMPLEMENT = str.maketrans("AUCGRYMKSWBDHVN", "UAGCYRKMSWVHDBN")
+
+    def __init__(self, sequence: str):
+        # Skip DNASequence's BioPython Seq construction (it expects T not U).
+        self.sequence = sequence.upper()
+        self._validate()
+        self._cached_gc_content: float | None = None
+        self._cached_molecular_weight: float | None = None
+
+    @property
+    def complement(self) -> "RNASequence":
+        return RNASequence(self.sequence.translate(self._COMPLEMENT))
+
+    @property
+    def reverse_complement(self) -> "RNASequence":
+        return RNASequence(self.sequence.translate(self._COMPLEMENT)[::-1])
