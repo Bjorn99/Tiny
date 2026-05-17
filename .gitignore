@@ -35,3 +35,4 @@ htmlcov/
 features.json
 results.json
 *.json.bak
+.worktrees/
