@@ -31,6 +31,9 @@ htmlcov/
 *~
 .DS_Store
 
+# Learning materials (personal study notes)
+docs/learning/
+
 # Project-specific
 features.json
 results.json
