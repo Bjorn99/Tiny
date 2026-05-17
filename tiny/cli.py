@@ -475,5 +475,128 @@ def supported_formats():
     console.print(table)
 
 
+@app.command(name="translate")
+def translate_cmd(
+    sequence: str = typer.Argument(None, help="DNA sequence (or use --input)."),
+    input: Path | None = typer.Option(
+        None, "--input", "-i", help="Path to a FASTA/GenBank/EMBL file."
+    ),
+    table: int = typer.Option(1, "--table", "-t", help="NCBI genetic code table number (1-33)."),
+    frame: int = typer.Option(0, "--frame", "-f", help="Reading frame offset (0, 1, or 2)."),
+    strand: int = typer.Option(
+        1, "--strand", "-s", help="+1 for forward strand, -1 for reverse complement."
+    ),
+    to_stop: bool = typer.Option(
+        False, "--to-stop", help="Halt translation at the first in-frame stop codon."
+    ),
+    explain: bool = typer.Option(False, "--explain", help="Print algorithm walk-through."),
+):
+    """Translate a DNA sequence to protein using the NCBI genetic code."""
+    from tiny.algorithms.orf import translate
+    from tiny.core.errors import InvalidSequenceError
+    from tiny.core.sequence import DNASequence
+
+    if explain:
+        from tiny.algorithms.orf_explain import TRANSLATE_EXPLANATION
+
+        console.print(
+            Panel(TRANSLATE_EXPLANATION, title="How translate works", border_style="cyan")
+        )
+
+    if sequence is None and input is None:
+        console.print("[red]Provide a sequence argument or --input file.[/red]")
+        raise typer.Exit(code=2)
+
+    if input is not None:
+        from tiny.core.formats import FormatHandler
+
+        records = FormatHandler.read_file(input)
+        dna = records[0].sequence
+    else:
+        dna = sequence
+
+    try:
+        DNASequence(dna)
+    except InvalidSequenceError as e:
+        console.print(f"[red]Invalid sequence:[/red] {e}")
+        raise typer.Exit(code=1) from e
+
+    result = translate(dna, table_id=table, frame=frame, strand=strand, to_stop=to_stop)
+
+    title = f"Protein (table {result.table_id})"
+    if result.warnings:
+        console.print()
+        for w in result.warnings:
+            console.print(f"[yellow]Warning:[/yellow] {w}")
+
+    console.print(Panel(result.protein, title=title, border_style="green"))
+
+
+@app.command("find-orfs")
+def find_orfs_cmd(
+    sequence: str = typer.Argument(None, help="DNA sequence (or use --input)."),
+    input: Path | None = typer.Option(
+        None, "--input", "-i", help="Path to a FASTA/GenBank/EMBL file."
+    ),
+    table: int = typer.Option(1, "--table", "-t", help="NCBI genetic code table number."),
+    min_length: int = typer.Option(
+        100, "--min-length", "-m", help="Minimum ORF length in nucleotides."
+    ),
+    explain: bool = typer.Option(False, "--explain", help="Print algorithm walk-through."),
+):
+    """Find open reading frames in all six reading frames."""
+    from tiny.algorithms.orf import find_orfs
+    from tiny.core.errors import InvalidSequenceError
+    from tiny.core.sequence import DNASequence
+
+    if explain:
+        from tiny.algorithms.orf_explain import FIND_ORFS_EXPLANATION
+
+        console.print(
+            Panel(FIND_ORFS_EXPLANATION, title="How find-orfs works", border_style="cyan")
+        )
+
+    if sequence is None and input is None:
+        console.print("[red]Provide a sequence argument or --input file.[/red]")
+        raise typer.Exit(code=2)
+
+    if input is not None:
+        from tiny.core.formats import FormatHandler
+
+        records = FormatHandler.read_file(input)
+        dna = records[0].sequence
+    else:
+        dna = sequence
+
+    try:
+        DNASequence(dna)
+    except InvalidSequenceError as e:
+        console.print(f"[red]Invalid sequence:[/red] {e}")
+        raise typer.Exit(code=1) from e
+
+    orfs = find_orfs(dna, table_id=table, min_length=min_length)
+    if not orfs:
+        console.print("[yellow]No ORFs found above min-length.[/yellow]")
+        return
+
+    tbl = create_analysis_table("Open Reading Frames")
+    tbl.add_column("Frame")
+    tbl.add_column("Strand")
+    tbl.add_column("Start")
+    tbl.add_column("End")
+    tbl.add_column("Length (nt)")
+    tbl.add_column("Protein")
+    for orf in sorted(orfs, key=lambda o: (o.frame, o.start)):
+        tbl.add_row(
+            str(orf.frame),
+            orf.strand,
+            str(orf.start),
+            str(orf.end),
+            str(orf.length_nt),
+            orf.protein if len(orf.protein) <= 60 else orf.protein[:57] + "...",
+        )
+    console.print(tbl)
+
+
 if __name__ == "__main__":
     app()

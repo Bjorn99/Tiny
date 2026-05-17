@@ -140,6 +140,45 @@ tiny find-motifs ATCGATCG ATCTATCG ATCGAGCG --length 4 --min-freq 2
 tiny find-motifs --input sequences.fasta --length 6 --min-freq 3
 ```
 
+### ORFs and Translation
+
+Translate a DNA sequence to protein (NCBI standard genetic code):
+
+```sh
+tiny translate ATGAAATAG
+tiny translate --input eg_files/CDKN1B_cds.fasta
+tiny translate ATGAGA --table 2          # vertebrate mitochondrial code
+tiny translate CTATTTCAT --strand -1     # reverse complement
+tiny translate ATG --explain             # print algorithm walk-through
+```
+
+Find all open reading frames in all six reading frames:
+
+```sh
+tiny find-orfs --input eg_files/CDKN1B_cds.fasta --min-length 100
+tiny find-orfs ATGAAATAG --min-length 0
+tiny find-orfs ATGCCCTAA --min-length 0 --table 6  # ciliate code
+tiny find-orfs ATGAAATAG --min-length 0 --explain
+```
+
+`--min-length` is in nucleotides (default `100`). `--table` selects one of
+7 NCBI genetic code tables (default `1`, Standard). `--explain` prints a
+short walk-through of the algorithm; the full educational write-up lives in
+the companion notebook.
+
+### Rendering the notebooks
+
+The notebooks under `notebooks/` are Quarto documents (`.qmd`). Rendering them
+requires [Quarto](https://quarto.org) and Jupyter. Install Jupyter via the
+optional Poetry group:
+
+```sh
+poetry install --with notebooks
+cd notebooks && quarto render 01_orf_translation.qmd
+```
+
+The rendered HTML is gitignored.
+
 ### Regulatory Element Analysis
 ```bash
 # Find regulatory elements in a sequence
@@ -191,15 +230,15 @@ This project is licensed under the GPL License - see the LICENSE file for detail
 
 ## Project Status
 
-Tiny is under active revival (Phase 0 complete: foundation hardening — typed errors, lazy heavy deps, CI, RNA class, version flag, resource limits). Future planned features:
+Tiny is under active revival. **Phase 1 complete** — ORF finding and translation
+with 7 NCBI genetic code tables, CLI commands, and a Quarto companion notebook.
+**Phase 0** (foundation hardening: typed errors, lazy heavy deps, CI, RNA class,
+version flag, resource limits) shipped previously. Future planned features:
+- Primer melting temperature (nearest-neighbor)
+- Needleman-Wunsch / Smith-Waterman from scratch
+- Position weight matrix motifs
+- Burrows-Wheeler transform / FM-index
 - CLI exposure for RNA sequence analysis
-- Multiple sequence alignment
-- Phylogenetic analysis
-- Secondary structure prediction
-- Support for additional file formats
-- Performance optimizations for longer sequences
-- Advanced statistical analysis
-- Integration with external databases
 
 ## Support
 

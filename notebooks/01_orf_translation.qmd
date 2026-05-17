@@ -1,0 +1,234 @@
+---
+title: "01 — Open Reading Frames and Translation"
+author: "Bjorn"
+format:
+  html:
+    toc: true
+    code-fold: false
+    theme: cosmo
+jupyter: python3
+---
+
+## The biology in two paragraphs
+
+A gene's coding sequence is read by the ribosome three nucleotides at a time.
+Each three-letter window is a **codon**, and the **genetic code** maps each
+codon to one of 20 amino acids or to a "stop" signal. Translation starts at a
+start codon and proceeds until it hits the first in-frame stop codon.
+
+A double-stranded DNA molecule has two complementary strands. Each strand can
+be read starting from offset 0, 1, or 2. That gives **six reading frames** —
+three on the forward strand, three on the reverse complement. "Find the ORFs"
+means searching all six for start-to-stop intervals.
+
+## The genetic code as a lookup table
+
+The standard genetic code (NCBI translation table 1) is a function
+$\text{codon} \rightarrow \text{amino acid}$. There are $4^3 = 64$ possible
+codons and 21 outputs (20 amino acids + 1 stop). Tiny stores this as a
+Python dict literal — 64 entries, O(1) lookup, trivially cross-validated.
+
+```{python}
+from tiny.algorithms.orf import STANDARD_CODON_TABLE, GENETIC_CODES
+
+len(STANDARD_CODON_TABLE), STANDARD_CODON_TABLE["ATG"], STANDARD_CODON_TABLE["TAA"]
+```
+
+### Degeneracy — why the code is robust
+
+The genetic code is **degenerate**: 61 sense codons encode only 20 amino acids.
+Most amino acids have 2, 4, or 6 synonymous codons, and the difference usually
+falls at the third codon position (the **wobble** position). This means many
+point mutations are *silent* — they change the DNA but not the protein.
+
+```{python}
+from collections import Counter
+
+aa_to_codons: dict[str, list[str]] = {}
+for codon, aa in STANDARD_CODON_TABLE.items():
+    aa_to_codons.setdefault(aa, []).append(codon)
+{aa: codons for aa, codons in aa_to_codons.items() if len(codons) >= 4}
+```
+
+### Not all organisms use the same code
+
+The standard code (table 1) works for most nuclear genomes, but mitochondrial
+and some microbial lineages deviate. Tiny ships with 7 NCBI genetic code
+tables. Here is what differs:
+
+```{python}
+for tid in sorted(GENETIC_CODES):
+    t = GENETIC_CODES[tid]
+    stops = ", ".join(sorted(t["stop_codons"]))
+    starts = ", ".join(sorted(t["start_codons"]))
+    print(f"Table {tid:>2} — {t['name']}")
+    print(f"        Starts: {starts}")
+    print(f"        Stops:  {stops}")
+    print()
+```
+
+Key differences from the standard code:
+
+- **Table 2 (Vertebrate Mitochondrial):** AGA/AGG become STOP (not Arg), AUA
+  becomes Met (not Ile), UGA becomes Trp (not STOP). Human mtDNA needs this.
+- **Table 6 (Ciliate Nuclear):** UAA/UAG become Gln — only UGA remains as
+  STOP. _Tetrahymena_ uses this.
+- **Table 11 (Bacterial):** Same codon→AA mapping as standard, but recognises
+  eight start codons (ATA, ATC, ATT, CTG, GTG, TTG in addition to ATG).
+
+## Translation by hand
+
+```{python}
+from tiny.algorithms.orf import translate
+
+dna = "ATGAAATAG"  # M-K-*
+result = translate(dna)
+print(f"DNA:     {dna}")
+print(f"Protein: {result.protein}")
+print(f"Warnings: {result.warnings}")
+print(f"Table used: {result.table_id}")
+print(f"Stop positions (AA): {result.stop_positions}")
+```
+
+The function walks `dna` in steps of three, looks each codon up in the
+selected table, and concatenates the amino-acid letters. A trailing partial
+codon is dropped with a warning — the same convention BioPython uses.
+Ambiguous bases (anything outside ACGT) translate to `"X"`.
+
+```{python}
+# Edge cases
+print(translate("ATGAA"))       # partial trailing codon → warning
+print(translate("ATN").protein) # ambiguous → "X"
+print(translate("augaaa"))      # case-insensitive
+print(translate("AUGAAA"))      # U→T normalisation (RNA just works)
+```
+
+### Strand and frame
+
+```{python}
+# Reverse strand: revcomp("CTATTTCAT") = "ATGAAATAG"
+print("Reverse strand:", translate("CTATTTCAT", strand=-1).protein)
+
+# Frame offset: skip the first base
+print("Frame 1:", translate("GATGAAATAG", frame=1).protein)
+```
+
+### Table selection
+
+```{python}
+seq = "ATGAGAAGGTGA"
+
+# Standard: AGA=R, AGG=R, TGA=STOP
+print("Table 1 (Standard):", translate(seq, table_id=1).protein)
+
+# Vertebrate mt: AGA=STOP, AGG=STOP, TGA=Trp
+print("Table 2 (Vert. mt):", translate(seq, table_id=2).protein)
+
+# Invertebrate mt: AGA=Ser, AGG=Ser, TGA=Trp
+print("Table 5 (Inv. mt):", translate(seq, table_id=5).protein)
+```
+
+### Translate until stop
+
+```{python}
+result = translate("ATGGGGTAAATGAAA", to_stop=True)
+print(f"Protein: {result.protein}")    # MG*
+print(f"Warnings: {result.warnings}")
+```
+
+## Six frames on a real CDS
+
+`CDKN1B_cds.fasta` in `eg_files/` is the coding sequence of human
+**Cyclin-Dependent Kinase Inhibitor 1B** (p27), a cell-cycle regulator.
+
+```{python}
+from Bio import SeqIO
+from tiny.algorithms.orf import six_frame_translate
+
+record = next(SeqIO.parse("../eg_files/CDKN1B_cds.fasta", "fasta"))
+dna = str(record.seq).upper()
+print(f"Sequence length: {len(dna)} nt\n")
+
+for frame in six_frame_translate(dna):
+    preview = frame.protein[:60] + ("..." if len(frame.protein) > 60 else "")
+    stop_count = frame.protein.count("*")
+    print(f"Frame {frame.frame}: {preview}  (stops: {stop_count})")
+```
+
+Only one of the six frames produces a clean, stop-free protein from start to
+finish — the one the gene was annotated in. The others are riddled with stop
+codons, exactly as you would expect from random-ish nucleotide strings.
+
+## Finding ORFs across all frames
+
+```{python}
+from tiny.algorithms.orf import find_orfs
+
+orfs = find_orfs(dna, min_length=100)
+print(f"Found {len(orfs)} ORFs above 100 nt\n")
+for orf in sorted(orfs, key=lambda o: -o.length_nt)[:5]:
+    print(
+        f"Frame {orf.frame} ({orf.strand}) "
+        f"start={orf.start} end={orf.end} "
+        f"length_nt={orf.length_nt} "
+        f"protein[:30]={orf.protein[:30]}"
+    )
+```
+
+The longest ORF on the forward strand is the annotated p27 protein. The
+shorter ORFs on the reverse strand are statistical noise — short stretches
+between random start and stop codons. The `--min-length` filter (default
+100 nt) removes these.
+
+### Nested ORFs
+
+Multiple start codons can share the same stop codon. Tiny reports all of them,
+matching the convention used by NCBI ORFfinder:
+
+```{python}
+# ATG AAA ATG AAA TAG → outer MKMK*, inner MK*
+seq = "ATGAAAATGAAATAG"
+orfs_frame1 = [o for o in find_orfs(seq, min_length=0) if o.frame == 1]
+for orf in orfs_frame1:
+    print(f"  start={orf.start} end={orf.end} protein={orf.protein}")
+```
+
+## Cross-validating against BioPython
+
+For correctness we compare every codon in every supported table against
+`Bio.Data.CodonTable`, which is the reference implementation used throughout
+the bioinformatics ecosystem. This is a development-time test — Tiny has no
+runtime dependency on BioPython for translation.
+
+```{python}
+from Bio.Data import CodonTable
+from tiny.algorithms.orf import GENETIC_CODES
+
+all_ok = True
+for tid in sorted(GENETIC_CODES):
+    t_bp = CodonTable.unambiguous_dna_by_id[tid]
+    t_tiny = GENETIC_CODES[tid]
+    for codon in t_bp.forward_table:
+        if t_tiny["codons"][codon] != t_bp.forward_table[codon]:
+            print(f"Table {tid}: {codon} mismatch")
+            all_ok = False
+print("All tables match BioPython." if all_ok else "MISMATCHES FOUND.")
+```
+
+## What we did not implement
+
+- **All 33 NCBI tables.** The 7 tables shipped cover the commonly used
+  alternatives. Adding a new table is a dict of codon overrides + metadata.
+- **Alternative start codons in `translate()`.** The function translates
+  whatever you give it — start codon validation is a separate annotation
+  concern. `find_orfs()` uses the table-specific start codon list.
+- **Selenocysteine (Sec, U) and pyrrolysine (Pyl, O).** These are the 21st
+  and 22nd amino acids, encoded by UGA and UAG respectively when specific
+  RNA secondary structures (SECIS/PYLIS elements) are present. Proper support
+  requires context-dependent translation — out of scope for a general tool.
+- **Ambiguous base resolution.** Codons containing IUPAC ambiguity codes
+  (N, R, Y, etc.) translate to `"X"`. A future `resolve_ambiguous` flag
+  could expand ambiguous codons to all possible concrete codons and return
+  the consensus amino acid.
+- **ORF filtering by amino-acid length.** Trivial to add:
+  `min_nt = 3 * min_aa + 3` (to account for the stop codon).
