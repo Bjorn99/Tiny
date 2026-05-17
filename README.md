@@ -34,28 +34,37 @@ Tiny is a powerful terminal-based bioinformatics tool designed for DNA sequence 
 - Palindromic sequence identification
 - Position information for all elements
 
-### 5. Enhanced Feature Analysis
+### 5. ORF Finding and Translation
+- DNA-to-protein translation in all 6 reading frames
+- 7 NCBI genetic code tables (Standard, Vertebrate/Yeast/Mold/Invertebrate Mt, Ciliate, Bacterial)
+- ORF detection with table-specific start/stop codons
+- Nested ORF reporting (matches NCBI ORFfinder convention)
+- Strand-specific translation (`--strand +1/-1`)
+- `--explain` flag prints algorithm walk-throughs
+- Companion Quarto notebook for deep educational dives
+
+### 6. Enhanced Feature Analysis
 - Comprehensive feature overview for GenBank files
 - Feature type filtering and counting
 - Customizable feature display limits
 - Detailed qualifier information
 - JSON export for complete feature data
 
-### 6. File Format Support
+### 7. File Format Support
 - FASTA (.fa, .fasta)
 - FASTQ (.fq, .fastq)
 - GenBank (.gb, .gbk, .genbank)
 - EMBL (.embl)
 - JSON output format
 
-### 7. Enhanced Visualization
+### 8. Enhanced Visualization
 - Progress bars for long operations
 - Color-coded output
 - Formatted tables
 - Summary statistics
 - Clear section separators
 
-### 8. Feature Analysis Options
+### 9. Feature Analysis Options
 - `--feature-limit`: Control number of features displayed (0 for all)
 - `--feature-type`: Filter specific feature types(CDS, gene, tRNA, etc.)
 - `--save-features`: Export complete feature data to JSON
@@ -198,7 +207,14 @@ tiny find-regulatory TATAAAAGGCGGGCCAATATCGATCG
    - Supports multiple file formats (FASTA, FASTQ, GenBank, EMBL, plus SAM/BAM with the `sam` extra)
    - Hard cap on per-sequence length: **10,000 bp** (raises `ResourceLimitError`). Override per-call with `TINY_MAX_SEQUENCE=50000 tiny analyze ...`.
 
-3. **Analysis Limitations**
+3. **Translation Limitations**
+   - 7 of 33 NCBI genetic code tables shipped; remaining tables can be added on request
+   - Ambiguous IUPAC codons resolve to single AA when all expansions agree, otherwise `X`
+   - Known deviation from BioPython: Tiny uses `X` where BioPython uses `B`/`Z`/`J` for ambiguous amino-acid groups (Asx/Glx/Xle)
+   - Selenocysteine (U) and pyrrolysine (O) not supported — these require context-dependent translation
+   - ORF definition requires an in-frame stop codon; sequences truncated without a stop are not reported
+
+4. **Analysis Limitations**
    - No support for multiple sequence alignment
    - No secondary structure prediction
    - No phylogenetic analysis capabilities
@@ -212,6 +228,8 @@ tiny find-regulatory TATAAAAGGCGGGCCAATATCGATCG
 - Use format-specific information with --format-info flag
 - Save results to files for later analysis
 - Use file input for multiple sequence analysis
+- Try `--explain` on any command to learn the underlying algorithm
+- Select the correct genetic code table with `--table` when translating non-nuclear sequences
 
 ## Contributing
 
