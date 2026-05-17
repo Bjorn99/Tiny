@@ -39,3 +39,8 @@ features.json
 results.json
 *.json.bak
 .worktrees/
+
+# Quarto build artifacts
+notebooks/*.html
+notebooks/*_files/
+notebooks/.quarto/

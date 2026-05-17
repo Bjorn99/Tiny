@@ -34,28 +34,37 @@ Tiny is a powerful terminal-based bioinformatics tool designed for DNA sequence 
 - Palindromic sequence identification
 - Position information for all elements
 
-### 5. Enhanced Feature Analysis
+### 5. ORF Finding and Translation
+- DNA-to-protein translation in all 6 reading frames
+- 7 NCBI genetic code tables (Standard, Vertebrate/Yeast/Mold/Invertebrate Mt, Ciliate, Bacterial)
+- ORF detection with table-specific start/stop codons
+- Nested ORF reporting (matches NCBI ORFfinder convention)
+- Strand-specific translation (`--strand +1/-1`)
+- `--explain` flag prints algorithm walk-throughs
+- Companion Quarto notebook for deep educational dives
+
+### 6. Enhanced Feature Analysis
 - Comprehensive feature overview for GenBank files
 - Feature type filtering and counting
 - Customizable feature display limits
 - Detailed qualifier information
 - JSON export for complete feature data
 
-### 6. File Format Support
+### 7. File Format Support
 - FASTA (.fa, .fasta)
 - FASTQ (.fq, .fastq)
 - GenBank (.gb, .gbk, .genbank)
 - EMBL (.embl)
 - JSON output format
 
-### 7. Enhanced Visualization
+### 8. Enhanced Visualization
 - Progress bars for long operations
 - Color-coded output
 - Formatted tables
 - Summary statistics
 - Clear section separators
 
-### 8. Feature Analysis Options
+### 9. Feature Analysis Options
 - `--feature-limit`: Control number of features displayed (0 for all)
 - `--feature-type`: Filter specific feature types(CDS, gene, tRNA, etc.)
 - `--save-features`: Export complete feature data to JSON
@@ -140,6 +149,45 @@ tiny find-motifs ATCGATCG ATCTATCG ATCGAGCG --length 4 --min-freq 2
 tiny find-motifs --input sequences.fasta --length 6 --min-freq 3
 ```
 
+### ORFs and Translation
+
+Translate a DNA sequence to protein (NCBI standard genetic code):
+
+```sh
+tiny translate ATGAAATAG
+tiny translate --input eg_files/CDKN1B_cds.fasta
+tiny translate ATGAGA --table 2          # vertebrate mitochondrial code
+tiny translate CTATTTCAT --strand -1     # reverse complement
+tiny translate ATG --explain             # print algorithm walk-through
+```
+
+Find all open reading frames in all six reading frames:
+
+```sh
+tiny find-orfs --input eg_files/CDKN1B_cds.fasta --min-length 100
+tiny find-orfs ATGAAATAG --min-length 0
+tiny find-orfs ATGCCCTAA --min-length 0 --table 6  # ciliate code
+tiny find-orfs ATGAAATAG --min-length 0 --explain
+```
+
+`--min-length` is in nucleotides (default `100`). `--table` selects one of
+7 NCBI genetic code tables (default `1`, Standard). `--explain` prints a
+short walk-through of the algorithm; the full educational write-up lives in
+the companion notebook.
+
+### Rendering the notebooks
+
+The notebooks under `notebooks/` are Quarto documents (`.qmd`). Rendering them
+requires [Quarto](https://quarto.org) and Jupyter. Install Jupyter via the
+optional Poetry group:
+
+```sh
+poetry install --with notebooks
+cd notebooks && quarto render 01_orf_translation.qmd
+```
+
+The rendered HTML is gitignored.
+
 ### Regulatory Element Analysis
 ```bash
 # Find regulatory elements in a sequence
@@ -159,7 +207,14 @@ tiny find-regulatory TATAAAAGGCGGGCCAATATCGATCG
    - Supports multiple file formats (FASTA, FASTQ, GenBank, EMBL, plus SAM/BAM with the `sam` extra)
    - Hard cap on per-sequence length: **10,000 bp** (raises `ResourceLimitError`). Override per-call with `TINY_MAX_SEQUENCE=50000 tiny analyze ...`.
 
-3. **Analysis Limitations**
+3. **Translation Limitations**
+   - 7 of 33 NCBI genetic code tables shipped; remaining tables can be added on request
+   - Ambiguous IUPAC codons resolve to single AA when all expansions agree, otherwise `X`
+   - Known deviation from BioPython: Tiny uses `X` where BioPython uses `B`/`Z`/`J` for ambiguous amino-acid groups (Asx/Glx/Xle)
+   - Selenocysteine (U) and pyrrolysine (O) not supported — these require context-dependent translation
+   - ORF definition requires an in-frame stop codon; sequences truncated without a stop are not reported
+
+4. **Analysis Limitations**
    - No support for multiple sequence alignment
    - No secondary structure prediction
    - No phylogenetic analysis capabilities
@@ -173,6 +228,8 @@ tiny find-regulatory TATAAAAGGCGGGCCAATATCGATCG
 - Use format-specific information with --format-info flag
 - Save results to files for later analysis
 - Use file input for multiple sequence analysis
+- Try `--explain` on any command to learn the underlying algorithm
+- Select the correct genetic code table with `--table` when translating non-nuclear sequences
 
 ## Contributing
 
@@ -191,15 +248,15 @@ This project is licensed under the GPL License - see the LICENSE file for detail
 
 ## Project Status
 
-Tiny is under active revival (Phase 0 complete: foundation hardening — typed errors, lazy heavy deps, CI, RNA class, version flag, resource limits). Future planned features:
+Tiny is under active revival. **Phase 1 complete** — ORF finding and translation
+with 7 NCBI genetic code tables, CLI commands, and a Quarto companion notebook.
+**Phase 0** (foundation hardening: typed errors, lazy heavy deps, CI, RNA class,
+version flag, resource limits) shipped previously. Future planned features:
+- Primer melting temperature (nearest-neighbor)
+- Needleman-Wunsch / Smith-Waterman from scratch
+- Position weight matrix motifs
+- Burrows-Wheeler transform / FM-index
 - CLI exposure for RNA sequence analysis
-- Multiple sequence alignment
-- Phylogenetic analysis
-- Secondary structure prediction
-- Support for additional file formats
-- Performance optimizations for longer sequences
-- Advanced statistical analysis
-- Integration with external databases
 
 ## Support
 
