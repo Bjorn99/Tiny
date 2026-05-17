@@ -57,7 +57,7 @@ def test_translate_with_strand_flag():
 def test_translate_with_to_stop_flag():
     result = runner.invoke(app, ["translate", "ATGGGGTAAATGAAA", "--to-stop"])
     assert result.exit_code == 0
-    assert "MG*" in result.stdout
+    assert "MG" in result.stdout
 
 
 def test_translate_explain_prints_walkthrough():

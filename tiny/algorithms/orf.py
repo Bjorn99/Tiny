@@ -177,6 +177,45 @@ STANDARD_CODON_TABLE: dict[str, str] = GENETIC_CODES[1]["codons"]
 # does not contain ambiguous bases, so revcomp of non-ACGT is irrelevant here).
 _REVCOMP_TRANS = str.maketrans("ACGTacgt", "TGCAtgca")
 
+# IUPAC ambiguity expansion — maps each ambiguous base to its possible ACGT bases.
+# Used by _resolve_ambiguous_codon() to match BioPython's ambiguous codon handling.
+_IUPAC_EXPAND: dict[str, list[str]] = {
+    "A": ["A"],
+    "C": ["C"],
+    "G": ["G"],
+    "T": ["T"],
+    "R": ["A", "G"],
+    "Y": ["C", "T"],
+    "M": ["A", "C"],
+    "K": ["G", "T"],
+    "S": ["C", "G"],
+    "W": ["A", "T"],
+    "B": ["C", "G", "T"],
+    "D": ["A", "G", "T"],
+    "H": ["A", "C", "T"],
+    "V": ["A", "C", "G"],
+    "N": ["A", "C", "G", "T"],
+}
+
+
+def _resolve_ambiguous_codon(codon: str, table: dict[str, str]) -> str:
+    """Translate a codon that may contain IUPAC ambiguity codes.
+
+    Expands ambiguous bases to all possible concrete codons. If every expansion
+    translates to the same amino acid, returns that amino acid. Otherwise
+    returns 'X'. This matches Bio.Seq.translate behavior for ambiguous codons.
+    """
+    parts: list[list[str]] = [_IUPAC_EXPAND.get(b, [b]) for b in codon]
+    # Cartesian product — for 'ATR': ['A'], ['T'], ['A','G'] → ATA, ATG
+    from itertools import product as _product
+
+    aa_set: set[str] = set()
+    for concrete in _product(*parts):
+        aa_set.add(table.get("".join(concrete), "X"))
+        if len(aa_set) > 1:
+            return "X"
+    return aa_set.pop() if aa_set else "X"
+
 
 def _reverse_complement(dna: str) -> str:
     """Reverse-complement a DNA string. Pure string operation, no allocation beyond the result."""
@@ -257,23 +296,24 @@ def translate(
     stop_positions: list[int] = []
     for i in range(0, len(seq) - 2, 3):
         codon = seq[i : i + 3]
-        aa = table.get(codon, "X")
-        if aa == "X" and set(codon).issubset({"A", "C", "G", "T"}):
-            # Pure ACGT but not in table — should never happen with valid tables
-            pass
-        elif aa == "X":
-            warnings.append(
-                f"Codon {codon} at position {frame + i} contains ambiguous bases; "
-                f"translated as 'X'."
-            )
+        if set(codon).issubset({"A", "C", "G", "T"}):
+            aa = table.get(codon, "X")
+        else:
+            aa = _resolve_ambiguous_codon(codon, table)
+            if aa == "X":
+                warnings.append(
+                    f"Codon {codon} at position {frame + i} contains ambiguous bases; "
+                    f"translated as 'X'."
+                )
         amino_acids.append(aa)
         if codon in stop_codons:
-            stop_positions.append(len(amino_acids) - 1)  # 0-indexed AA position
+            stop_positions.append(len(amino_acids) - 1)
             if to_stop:
                 warnings.append(
                     f"Translation halted at stop codon {codon} "
                     f"(AA position {stop_positions[-1]})."
                 )
+                amino_acids.pop()  # match BioPython: to_stop excludes the *
                 break
 
     return TranslationResult(

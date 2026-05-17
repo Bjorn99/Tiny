@@ -157,9 +157,9 @@ def test_translate_reverse_strand():
 
 
 def test_translate_to_stop_halts_at_first_stop():
-    # ATG GGG TAA ATG AAA  → should stop at TAA, give MG*
+    # ATG GGG TAA ATG AAA  → should stop at TAA, give MG (stop excluded per BioPython convention)
     result = translate("ATGGGGTAAATGAAA", to_stop=True)
-    assert result.protein == "MG*"
+    assert result.protein == "MG"
 
 
 def test_translate_to_stop_no_stop_codon_goes_to_end():
